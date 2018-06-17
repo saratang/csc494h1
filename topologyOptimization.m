@@ -106,13 +106,6 @@ numConstraints = numel(floorVerts);
 P = eye(numel(V), numel(V));
 P([2*[floorVerts; isolatedVerts]-1;2*[floorVerts; isolatedVerts]], :) = [];
 
-% roofVerts. We want roofVerts because we want to assign roof edges a
-% super-low cost. For now let's do it for the "absolute roof", but we can
-% change this later to the incremental roof.
-roofVerts = find(V(:,2) == max(V(:,2)));
-[X, Y] = meshgrid(roofVerts, roofVerts);
-roofEdges = intersect([X(:) Y(:)], E, 'rows');
-
 %define J = A'
 J = At;
 
@@ -170,8 +163,30 @@ Aeq = Aeq * D;
 % Given.
 Beq = Jcon * inv(Kcon) * fcon;
 
-% The cost is the sum of all tensions + compressions
+% The cost is the weighted sum of all tensions + compressions
+% f is a horizontal vector such that:
+%   - roof edges have weight 0... because we always want to include them
+%   - overconstrained edges have weight 1.5 or 2 or something... because
+%     we want to avoid them if possible
+% CAVEAT 1: assign the roof weights first so that we can overwrite them
+% with the overconstrained ones if necessary.
 f = ones(size(Aeq, 2), 1);
+
+
+% roofVerts. We want roofVerts because we want to assign roof edges a
+% super-low cost. For now let's do it for the "absolute roof", but we can
+% change this later to the incremental roof.
+roofVerts = find(V(:,2) == max(V(:,2)));
+[X, Y] = meshgrid(roofVerts, roofVerts);
+roofEdges = intersect([X(:) Y(:)], E, 'rows');
+
+% TODO: ask Dave what the better way to do this is lol
+roofInds = find(ismember(E, roofEdges, 'rows'));
+roofInds = [roofInds roofInds + size(E,1)];
+f(roofInds) = 0;
+overconstrainedInds = [size(E, 1) - size(Enew, 1) + 1:size(E, 1)];
+overconstrainedInds = [overconstrainedInds overconstrainedInds + size(E,1)];
+f(overconstrainedInds) = 1.5;
 
 % Also add the constraint that all tensions, compressions >= 0
 A = eye(size(f, 1));
