@@ -2,10 +2,13 @@
 % V - Vertices stored as nx3 matrix
 % E - edges stores as mx2 matrix
 % levelV - indices of vertices that are in the current level
-% i is the current level. I guess I'll get rid of it later since I just use
+% levelNum is the current level. I guess I'll get rid of it later since I just use
 % it to label figures.
 function  dataOpt = topologyOptimization(V,E,levelV, levelNum)
 
+
+% TODO: This is not generating the trusses I want. How can I generate the
+% trusses I want?
 adjacencyMatrix = zeros(size(V,1), size(V,1));
 adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,1), E(:,2))) = 1;
 adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,2), E(:,1))) = 1;
@@ -13,7 +16,7 @@ adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,2), E(:,1))) = 1;
 
 adjacencyMatrix = adjacencyMatrix - eye(size(V,1));
 
-newTrusses = adjacencyMatrix*adjacencyMatrix;
+newTrusses = adjacencyMatrix * adjacencyMatrix;
 
 Enew = [];
 
@@ -92,7 +95,9 @@ fExt = zeros(size(V,1),2);
 
 fExt = reshape(transpose(fExt), numVars, 1);
 fExt(2:2:end) = -9.8;
-%fExt(1:2:end) = (rand(size(fExt, 1) / 2, 1) - 0.5) * 2;
+
+% NOISE
+fExt(1:2:end) = (rand(size(fExt, 1) / 2, 1) - 0.5) * 2;
 
 %Project out fixed constraints from matrices
 %detect nodes on "floor"
@@ -172,7 +177,6 @@ Beq = Jcon * inv(Kcon) * fcon;
 % with the overconstrained ones if necessary.
 f = ones(size(Aeq, 2), 1);
 
-
 % roofVerts. We want roofVerts because we want to assign roof edges a
 % super-low cost. For now let's do it for the "absolute roof", but we can
 % change this later to the incremental roof.
@@ -181,6 +185,7 @@ roofVerts = find(V(:,2) == max(V(:,2)));
 roofEdges = intersect([X(:) Y(:)], E, 'rows');
 
 % TODO: ask Dave what the better way to do this is lol
+% TODO: how do I time runtime analysis in Matlab
 roofInds = find(ismember(E, roofEdges, 'rows'));
 roofInds = [roofInds roofInds + size(E,1)];
 f(roofInds) = 0;
@@ -208,10 +213,6 @@ dataOpt = tensions;
 %don't plot the zero ones
 %plot the others with different colours corresponding to different tensions
 
-disp("V");
-disp(V);
-disp("E");
-disp(E);
 disp("tensions");
 disp(tensions);
 

@@ -48,13 +48,18 @@ classdef leveller
             G = graph(table(edges, 'variableNames', {'EndNodes'}));
             for i = 1:size(groundVertices, 1)
                 groundV = groundVertices(i);
-                T = bfsearch(G, groundV, {'edgetonew', 'edgetodiscovered', 'discovernode'});
+                T = bfsearch(G, groundV, {'edgetonew', 'edgetodiscovered'});
                 curLevel = 1;
                 updateLevel = NaN;
                 for eid = 1:size(T, 1)
                     event = T.Event(eid);
                     edge = T.Edge(eid, :);
                     node = T.Node(eid);
+                    if (edge(1) == updateLevel)
+                        updateLevel = NaN;
+                        curLevel = curLevel + 1;
+                    end
+                    
                     if event == 'edgetonew'
                         if (isnan(updateLevel))
                             updateLevel = edge(2);
@@ -64,10 +69,6 @@ classdef leveller
                         obj.verticesToLevels(edge(2)) = min(obj.verticesToLevels(edge(2)), curLevel);
                     end
                     if event == 'edgetodiscovered'
-                        if edge(1) == updateLevel
-                            updateLevel = NaN;
-                            curLevel = curLevel + 1;
-                        end
                         edgeID = getEdgeIndex(edges, edge);
                         obj.edgesToLevels(edgeID) = min(obj.edgesToLevels(edgeID), curLevel);
                     end
