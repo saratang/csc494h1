@@ -186,18 +186,17 @@ roofVerts = find(V(:,2) == max(V(:,2)));
 roofEdges = intersect([X(:) Y(:)], E, 'rows');
 
 % TODO: ask Dave what the better way to do this is lol
-% TODO: how do I time runtime analysis in Matlab
+% TODO: how do I do runtime analysis in Matlab
 roofInds = find(ismember(E, roofEdges, 'rows'));
 roofInds = [roofInds roofInds + size(E,1)];
 f(roofInds) = 0;
 overconstrainedInds = [size(E, 1) - size(Enew, 1) + 1:size(E, 1)];
 overconstrainedInds = [overconstrainedInds overconstrainedInds + size(E,1)];
-f(overconstrainedInds) = 5;
+f(overconstrainedInds) = 1e5;
 
 % Also add the constraint that all tensions, compressions >= 0
 A = eye(size(f, 1));
 b = zeros(size(f, 1), 1);
-b(roofInds) = 0.00001;
 
 %X should be a col. vector with top half tension, lower half compressions
 X = linprog(f, -A, b, Aeq, Beq);
@@ -209,7 +208,7 @@ tensions = X(1:size(X, 1) / 2);
 compressions = X(size(X, 1) / 2 + 1 : end);
 %disp(tensions);
 
-stress = abs(tensions + compressions);
+stress = abs(tensions - compressions);
 
 %HACK
 threshold = 1e-04;
@@ -227,11 +226,15 @@ disp(stress);
 
 figure
 hold on
-line([V(E(stress > threshold,1),1)'; ...
-    V(E(stress > threshold,2),1)'], ...
-    [V(E(stress > threshold,1),2)'; ...
-    V(E(stress > threshold,2),2)'], ...
-    'Color', [0 0 1]);
+line([V(E(stress > threshold,1),1); ...
+      V(E(stress > threshold,2),1); ...
+      V(roofEdges(:,1),1); ...
+      V(roofEdges(:,2),1)]', ...
+     [V(E(stress > threshold,1),2); ...
+      V(E(stress > threshold,2),2); ...
+      V(roofEdges(:,1),2); ...
+      V(roofEdges(:,2),2)]', ...
+     'Color', [0 0 1]);
 title(["Optimized at level " levelNum]);
 hold off
 
