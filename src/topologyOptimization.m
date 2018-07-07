@@ -1,3 +1,5 @@
+
+
 %INPUT
 % V - Vertices stored as nx3 matrix
 % E - edges stores as mx2 matrix
@@ -5,68 +7,6 @@
 % levelNum is the current level. I guess I'll get rid of it later since I just use
 % it to label figures.
 function  dataOpt = topologyOptimization(V,E,levelV, levelNum)
-
-
-% TODO: This is not generating the trusses I want. How can I generate the
-% trusses I want?
-adjacencyMatrix = zeros(size(V,1), size(V,1));
-adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,1), E(:,2))) = 1;
-adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,2), E(:,1))) = 1;
-
-
-adjacencyMatrix = adjacencyMatrix - eye(size(V,1));
-
-newTrusses = adjacencyMatrix * adjacencyMatrix * adjacencyMatrix;
-
-Enew = [];
-
-%extract new edges
-for ii=1:size(V,1)
-    temp = find(newTrusses(ii,:) ~=0);
-    
-    for jj = 1:numel(temp)
-        Enew = [Enew; ii temp(jj)];
-    end
-end
-
-Enew = unique([Enew; Enew(:,2) Enew(:,1)], 'rows');
-%add some new edges to make the structure statically over determined
-
-%strip non unique edges
-[Ecommon1, IA, IB] = intersect(E, Enew, 'rows');
-Enew(IB,:) = [];
-
-[Ecommon1, IA, IB] = intersect(E, [Enew(:,2) Enew(:,1)], 'rows');
-Enew(IB,:) = [];
-Eorig = E;
-E = [E; Enew];
-
-figure
-hold on
-line([V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], 'Color', [1 0 0]);
-line([V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], 'Color', [0 0 1]);
-title(["Overconstrained input at level " levelNum])
-hold off
-
-%vertex variables are flattened as [v1x, v1y; v2x, v2y ......]
-Evec = V(E(:,2),:) - V(E(:,1),:);
-
-%Build K matrix
-numEdges = size(E,1);
-numVerts = size(V,1);
-numVars = 2*numVerts; %x and y position for each truss
-numVarsUncompressed = 2*numEdges;
-
-%A matrix (accumulation, distribution)
-% i i+1 i+2 i i+1 i+2
-% j j+1 j+2 j+3 j+4 j+5
-% 1   1   1  -1  -1  -1
-val = repmat([-1 1 -1 1], 1, numEdges);
-iRow = reshape(repmat(1:numVarsUncompressed, 2,1),2*numVarsUncompressed,1);
-E1ind = [2*E(:,1)-1 2*E(:,1)]';
-E2ind = [2*E(:,2)-1 2*E(:,2)]';
-iCol = reshape([E1ind(:) E2ind(:)]',2*numVarsUncompressed,1);
-At = sparse(iRow, iCol, val, 2*numEdges, numVars);
 
     function B = constitutiveModel(vol, ym, eVec)
         %vol is a vector of truss volumes
@@ -87,10 +27,97 @@ At = sparse(iRow, iCol, val, 2*numEdges, numVars);
         
     end
 
-forceVerts = (find(and(abs(V(:,1) - max(V(:,1)))<1e-8,V(:,2) == 0)));
+% TODO: This is not generating the trusses I want. How can I generate the
+% trusses I want?
+adjacencyMatrix = zeros(size(V,1), size(V,1));
+adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,1), E(:,2))) = 1;
+adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,2), E(:,1))) = 1;
 
-B = constitutiveModel(ones(size(E,1), 1), 1, Evec);
-K = At'*B*At;
+
+adjacencyMatrix = adjacencyMatrix - eye(size(V,1));
+
+newTrusses = adjacencyMatrix;
+K = [];
+At = [];
+valid = 0;
+
+while ~valid
+    newTrusses = newTrusses * adjacencyMatrix;
+    
+    Enew = [];
+    
+    %extract new edges
+    for ii=1:size(V,1)
+        temp = find(newTrusses(ii,:) ~=0);
+        
+        for jj = 1:numel(temp)
+            Enew = [Enew; ii temp(jj)];
+        end
+    end
+    
+    Enew = unique([Enew; Enew(:,2) Enew(:,1)], 'rows');
+    %add some new edges to make the structure statically over determined
+    
+    %strip non unique edges
+    [Ecommon1, IA, IB] = intersect(E, Enew, 'rows');
+    Enew(IB,:) = [];
+    
+    [Ecommon1, IA, IB] = intersect(E, [Enew(:,2) Enew(:,1)], 'rows');
+    Enew(IB,:) = [];
+    Eorig = E;
+    E = [E; Enew];
+    
+    %vertex variables are flattened as [v1x, v1y; v2x, v2y ......]
+    Evec = V(E(:,2),:) - V(E(:,1),:);
+    
+    %Build K matrix
+    numEdges = size(E,1);
+    numVerts = size(V,1);
+    numVars = 2*numVerts; %x and y position for each truss
+    numVarsUncompressed = 2*numEdges;
+    
+    %A matrix (accumulation, distribution)
+    % i i+1 i+2 i i+1 i+2
+    % j j+1 j+2 j+3 j+4 j+5
+    % 1   1   1  -1  -1  -1
+    val = repmat([-1 1 -1 1], 1, numEdges);
+    iRow = reshape(repmat(1:numVarsUncompressed, 2,1),2*numVarsUncompressed,1);
+    E1ind = [2*E(:,1)-1 2*E(:,1)]';
+    E2ind = [2*E(:,2)-1 2*E(:,2)]';
+    iCol = reshape([E1ind(:) E2ind(:)]',2*numVarsUncompressed,1);
+    At = sparse(iRow, iCol, val, 2*numEdges, numVars);
+    
+    forceVerts = (find(and(abs(V(:,1) - max(V(:,1)))<1e-8,V(:,2) == 0)));
+    
+    B = constitutiveModel(ones(size(E,1), 1), 1, Evec);
+    K = At'*B*At;
+    
+    floorVerts = find(V(:,2) == min(V(:,2)));
+    isolatedVerts = setdiff(1:size(V, 1), levelV).';
+    numConstraints = numel(floorVerts);
+    P = eye(numel(V), numel(V));
+    P([2*[floorVerts; isolatedVerts]-1;2*[floorVerts; isolatedVerts]], :) = [];
+    Kcon = P*K*P';
+    
+    % CONSULT DAVE
+    % Get minimal absolute eigenvalue.
+    min_eig = min(abs(eig(Kcon)));
+    disp(min_eig);
+    valid = (min_eig > sqrt(eps));
+    
+    if ~valid
+        E = Eorig;
+    end
+end
+    
+figure
+hold on
+line([V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], 'Color', [1 0 0]);
+line([V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], 'Color', [0 0 1]);
+title(["Overconstrained input at level " levelNum])
+hold off
+
+
 fExt = zeros(size(V,1),2);
 %fExt(forceVerts, 2) = -0.1;
 
@@ -190,9 +217,10 @@ roofEdges = intersect([X(:) Y(:)], E, 'rows');
 roofInds = find(ismember(E, roofEdges, 'rows'));
 roofInds = [roofInds roofInds + size(E,1)];
 f(roofInds) = 0;
+
 overconstrainedInds = [size(E, 1) - size(Enew, 1) + 1:size(E, 1)];
 overconstrainedInds = [overconstrainedInds overconstrainedInds + size(E,1)];
-f(overconstrainedInds) = 1e5;
+f(overconstrainedInds) = 1e6;
 
 % Also add the constraint that all tensions, compressions >= 0
 A = eye(size(f, 1));
@@ -226,17 +254,27 @@ disp(stress);
 
 figure
 hold on
-line([V(E(stress > threshold,1),1); ...
-      V(E(stress > threshold,2),1); ...
-      V(roofEdges(:,1),1); ...
-      V(roofEdges(:,2),1)]', ...
-     [V(E(stress > threshold,1),2); ...
-      V(E(stress > threshold,2),2); ...
-      V(roofEdges(:,1),2); ...
-      V(roofEdges(:,2),2)]', ...
-     'Color', [0 0 1]);
+line([V(E(stress > threshold,1),1)'; ...
+    V(E(stress > threshold,2),1)'], ...
+    [V(E(stress > threshold,1),2)'; ...
+    V(E(stress > threshold,2),2)'], ...
+    'Color', [0 0 1]);
 title(["Optimized at level " levelNum]);
 hold off
+
+% figure
+% hold on
+% line([V(E(stress > threshold,1),1); ...
+%     V(E(stress > threshold,2),1); ...
+%     V(roofEdges(:,1),1); ...
+%     V(roofEdges(:,2),1)]', ...
+%     [V(E(stress > threshold,1),2); ...
+%     V(E(stress > threshold,2),2); ...
+%     V(roofEdges(:,1),2); ...
+%     V(roofEdges(:,2),2)]', ...
+%     'Color', [0 0 1]);
+% title(["Optimized at level " levelNum]);
+% hold off
 
 end
 
