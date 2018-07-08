@@ -111,10 +111,12 @@ while ~valid
 end
     
 figure
+ax1 = subplot(1,4,[1 2]);
 hold on
-line([V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], 'Color', [1 0 0]);
-line([V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], 'Color', [0 0 1]);
-title(["Overconstrained input at level " levelNum])
+line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], 'Color', [1 0 0]);
+line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], 'Color', [0 0 1]);
+title(ax1, ["Overconstrained input at level " levelNum]);
+axis square;
 hold off
 
 
@@ -277,14 +279,19 @@ dataOpt = stress;
 disp("stress");
 disp(stress);
 
-figure
+ax2 = subplot(1,4,[3 4]);
 hold on
-line([V(E(stress > threshold,1),1)'; ...
+line(ax2, ...
+     [V(E(stress > threshold,1),1)'; ...
       V(E(stress > threshold,2),1)'], ...
      [V(E(stress > threshold,1),2)'; ...
       V(E(stress > threshold,2),2)'], ...
      'Color', [0 0 1]);
-title(["Optimized at level " levelNum]);
+title(ax2,["Optimized at level " levelNum]);
+% WARNING: specific to the current design. But I want the axes to match
+% so...
+axis([0 3 0 3]);
+axis square;
 hold off
 
 % figure
