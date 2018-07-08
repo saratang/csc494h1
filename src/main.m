@@ -16,38 +16,38 @@ if (nargin < 1)
     %IMMA DRAW THE T
     V = [0 2;
          0 3;
+         1 3;
+         2 3;
+         3 3;
+         3 2;
+         2 2;
+         2 1;
+         2 0;
          1 0;
          1 1;
-         1 2;
-         1 3;
-         2 0;
-         2 1;
-         2 2;
-         2 3;
-         3 2;
-         3 3];
+         1 2];
           
     E = [1 2;
-         2 6;
-         6 10;
-         10 12;
-         11 12;
-         9 11;
-         8 9;
-         7 8;
-         3 7;
+         2 3;
          3 4;
          4 5;
-         1 5];
-
+         5 6;
+         6 7;
+         7 8;
+         8 9;
+         9 10;
+         10 11;
+         11 12;
+         12 1];
     
 else
     [V, E] = bwmesh(png_filename);
 end
 
 
+%TODO: find a better way to do this. BFS fails if the edges are not unique
 %uniquify
-E = E(E(:, 1) < E(:, 2), :);
+%E = E(E(:, 1) < E(:, 2), :);
 
 figure
 hold on

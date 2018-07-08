@@ -220,7 +220,32 @@ f(roofInds) = 0;
 
 overconstrainedInds = [size(E, 1) - size(Enew, 1) + 1:size(E, 1)];
 overconstrainedInds = [overconstrainedInds overconstrainedInds + size(E,1)];
-f(overconstrainedInds) = 1e6;
+f(overconstrainedInds) = 1e3;
+
+% TODO: Find edges that are not in the polygon.
+% For now, assume we have an outline and not a triangle mesh.
+% Do this by querying the midpoint of each edge and seeing if it's in the
+% polygon.
+
+% FORMAT: inpolygon(xq, yq, xv, yv) where
+%  - xq, yq are the coordinates we want to query
+%  - xv, yv are row vectors such that (xvi, yvi) defines a vertex of the
+%  polygon
+
+xv = V(:,1)';
+yv = V(:,2)';
+midpoints = ((V(E(:,1),:) + V(E(:,2),:)) / 2)';
+onequarter = ((3 * V(E(:,1),:) + V(E(:,2),:)) / 4)';
+threequarter = ((V(E(:,1),:) + 3 * V(E(:,2),:)) / 4)';
+in1 = inpolygon(midpoints(1,:), midpoints(2,:), xv, yv);
+in2 = inpolygon(onequarter(1,:), onequarter(2,:), xv, yv);
+in3 = inpolygon(threequarter(1,:), threequarter(2,:), xv, yv);
+
+% Now we select the indices of those that are outside and set them to an
+% insanely high weight
+outsideEdgeInds = find(~in1 | ~in2 | ~in3);
+outsideEdgeInds = [outsideEdgeInds outsideEdgeInds + size(E,1)];
+f(outsideEdgeInds) = 1e6;
 
 % Also add the constraint that all tensions, compressions >= 0
 A = eye(size(f, 1));
@@ -255,10 +280,10 @@ disp(stress);
 figure
 hold on
 line([V(E(stress > threshold,1),1)'; ...
-    V(E(stress > threshold,2),1)'], ...
-    [V(E(stress > threshold,1),2)'; ...
-    V(E(stress > threshold,2),2)'], ...
-    'Color', [0 0 1]);
+      V(E(stress > threshold,2),1)'], ...
+     [V(E(stress > threshold,1),2)'; ...
+      V(E(stress > threshold,2),2)'], ...
+     'Color', [0 0 1]);
 title(["Optimized at level " levelNum]);
 hold off
 
