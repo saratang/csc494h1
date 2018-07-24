@@ -2,17 +2,7 @@ function main(png_filename)
 V = [];
 E = [];
 
-if (nargin < 1)
-%     nX = 3;
-%     nY= 3;
-%     
-%     [X,Y] = meshgrid(linspace(-5,5,nX), linspace(-2.5,2.5,nY));
-%     V = [X(:), Y(:)];
-%     
-%     %build trusses by triangulating nodes
-%     F = delaunayTriangulation(V(:,1), V(:,2));
-%     E = edges(F);
-    
+if (nargin < 1)    
     %IMMA DRAW THE T
     V = [0 2;
          0 3;
@@ -41,13 +31,22 @@ if (nargin < 1)
          12 1];
     
 else
-    [V, E] = bwmesh(png_filename);
+    %TO-DO: sometimes this produces a non-stable mesh (one with pointy
+    %grounds)
+    [Vraw, Fraw] = bwmesh(png_filename);
+    [F, V] = reducepatch(Fraw, Vraw, 25);
+    
+    V = [V(:,1) V(:,2)];
+    E = boundary_faces(F);
+     
+    figure
+    tsurf(F, V);
+    
+    %TO-DO: In order for inpolygon to work, we need to pass
+    %in the edges as a polygon, ie. ordered set of edges.
+    %So we need to re-order them such that they form something like
+    %[a b; b c; c d; ... ]
 end
-
-
-%TODO: find a better way to do this. BFS fails if the edges are not unique
-%uniquify
-%E = E(E(:, 1) < E(:, 2), :);
 
 figure
 hold on
@@ -61,7 +60,7 @@ for i = 1:levelManager.maxLevel
     levelE = E(Einds, :);
     levelV = levelManager.getVerticesBelowLevel(i);
     
-    tensions = topologyOptimization(V, levelE, levelV, i);
+    tensions = topologyOptimization(V, E, levelE, levelV, i);
 end
 
 end

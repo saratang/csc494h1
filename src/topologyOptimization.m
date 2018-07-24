@@ -6,7 +6,7 @@
 % levelV - indices of vertices that are in the current level
 % levelNum is the current level. I guess I'll get rid of it later since I just use
 % it to label figures.
-function  dataOpt = topologyOptimization(V,E,levelV, levelNum)
+function  dataOpt = topologyOptimization(V,allE,levelE,levelV, levelNum)
 
     function B = constitutiveModel(vol, ym, eVec)
         %vol is a vector of truss volumes
@@ -30,8 +30,8 @@ function  dataOpt = topologyOptimization(V,E,levelV, levelNum)
 % TODO: This is not generating the trusses I want. How can I generate the
 % trusses I want?
 adjacencyMatrix = zeros(size(V,1), size(V,1));
-adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,1), E(:,2))) = 1;
-adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,2), E(:,1))) = 1;
+adjacencyMatrix(sub2ind(size(adjacencyMatrix),levelE(:,1), levelE(:,2))) = 1;
+adjacencyMatrix(sub2ind(size(adjacencyMatrix),levelE(:,2), levelE(:,1))) = 1;
 
 
 adjacencyMatrix = adjacencyMatrix - eye(size(V,1));
@@ -59,19 +59,19 @@ while ~valid
     %add some new edges to make the structure statically over determined
     
     %strip non unique edges
-    [Ecommon1, IA, IB] = intersect(E, Enew, 'rows');
+    [Ecommon1, IA, IB] = intersect(levelE, Enew, 'rows');
     Enew(IB,:) = [];
     
-    [Ecommon1, IA, IB] = intersect(E, [Enew(:,2) Enew(:,1)], 'rows');
+    [Ecommon1, IA, IB] = intersect(levelE, [Enew(:,2) Enew(:,1)], 'rows');
     Enew(IB,:) = [];
-    Eorig = E;
-    E = [E; Enew];
+    Eorig = levelE;
+    levelE = [levelE; Enew];
     
     %vertex variables are flattened as [v1x, v1y; v2x, v2y ......]
-    Evec = V(E(:,2),:) - V(E(:,1),:);
+    Evec = V(levelE(:,2),:) - V(levelE(:,1),:);
     
     %Build K matrix
-    numEdges = size(E,1);
+    numEdges = size(levelE,1);
     numVerts = size(V,1);
     numVars = 2*numVerts; %x and y position for each truss
     numVarsUncompressed = 2*numEdges;
@@ -82,14 +82,14 @@ while ~valid
     % 1   1   1  -1  -1  -1
     val = repmat([-1 1 -1 1], 1, numEdges);
     iRow = reshape(repmat(1:numVarsUncompressed, 2,1),2*numVarsUncompressed,1);
-    E1ind = [2*E(:,1)-1 2*E(:,1)]';
-    E2ind = [2*E(:,2)-1 2*E(:,2)]';
+    E1ind = [2*levelE(:,1)-1 2*levelE(:,1)]';
+    E2ind = [2*levelE(:,2)-1 2*levelE(:,2)]';
     iCol = reshape([E1ind(:) E2ind(:)]',2*numVarsUncompressed,1);
     At = sparse(iRow, iCol, val, 2*numEdges, numVars);
     
     forceVerts = (find(and(abs(V(:,1) - max(V(:,1)))<1e-8,V(:,2) == 0)));
     
-    B = constitutiveModel(ones(size(E,1), 1), 1, Evec);
+    B = constitutiveModel(ones(size(levelE,1), 1), 1, Evec);
     K = At'*B*At;
     
     floorVerts = find(V(:,2) == min(V(:,2)));
@@ -106,7 +106,7 @@ while ~valid
     valid = (min_eig > sqrt(eps));
     
     if ~valid
-        E = Eorig;
+        levelE = Eorig;
     end
 end
     
@@ -118,7 +118,6 @@ line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'
 title(ax1, ["Overconstrained input at level " levelNum]);
 axis square;
 hold off
-
 
 fExt = zeros(size(V,1),2);
 %fExt(forceVerts, 2) = -0.1;
@@ -150,7 +149,7 @@ Jcon = J*P';
 fcon = P*fExt;
 
 %Truss direction matrix
-bIndices = repmat(1:size(E,1), 2,1);
+bIndices = repmat(1:size(levelE,1), 2,1);
 bI = 1:numel(Evec);
 bJ = bIndices(:);
 
@@ -161,29 +160,6 @@ T = sparse(bI, bJ, reshape(transpose(dE), numel(dE),1));
 
 %Build Dual problem matrices
 Jcon = T'*Jcon;
-
-% %METHOD 1: Solving the linear system.
-% %set-up the appropriate coefficient matrix
-% coefficients = [Kcon Jcon'; Jcon zeros(size(Jcon,1), size(Jcon,1))];
-%
-% %set-up the appropriate constant matrix
-% constants = [fcon; zeros(size(Jcon,1), size(fcon,2))];
-%
-% %do the solve
-% %UT = coefficients \ constants;
-%
-% % MAGIC
-% %disp(size(coefficients))
-% %disp(size(constants))
-% UT = quadprog(eye(size(coefficients, 1)), zeros(size(coefficients, 1), 1), [], [], coefficients, constants);
-% %U = quadprog(Kcon, -fcon, [], [], Jcon, zeros(size(Jcon,1), size(fcon,2)));
-%
-% %U = linsolve(coefficients, constants);
-%
-% %disp(size(UT));
-% %disp(UT);
-% %disp(U);
-
 
 % METHOD 2: L1-optimization
 % D-matrix looks like this: I | -I
@@ -212,16 +188,16 @@ f = ones(size(Aeq, 2), 1);
 % change this later to the incremental roof.
 roofVerts = find(V(:,2) == max(V(:,2)));
 [X, Y] = meshgrid(roofVerts, roofVerts);
-roofEdges = intersect([X(:) Y(:)], E, 'rows');
+roofEdges = intersect([X(:) Y(:)], levelE, 'rows');
 
 % TODO: ask Dave what the better way to do this is lol
 % TODO: how do I do runtime analysis in Matlab
-roofInds = find(ismember(E, roofEdges, 'rows'));
-roofInds = [roofInds roofInds + size(E,1)];
+roofInds = find(ismember(levelE, roofEdges, 'rows'));
+roofInds = [roofInds roofInds + size(levelE,1)];
 f(roofInds) = 0;
 
-overconstrainedInds = [size(E, 1) - size(Enew, 1) + 1:size(E, 1)];
-overconstrainedInds = [overconstrainedInds overconstrainedInds + size(E,1)];
+overconstrainedInds = [size(levelE, 1) - size(Enew, 1) + 1:size(levelE, 1)];
+overconstrainedInds = [overconstrainedInds overconstrainedInds + size(levelE,1)];
 f(overconstrainedInds) = 1e3;
 
 % TODO: Find edges that are not in the polygon.
@@ -234,11 +210,12 @@ f(overconstrainedInds) = 1e3;
 %  - xv, yv are row vectors such that (xvi, yvi) defines a vertex of the
 %  polygon
 
-xv = V(:,1)';
-yv = V(:,2)';
-midpoints = ((V(E(:,1),:) + V(E(:,2),:)) / 2)';
-onequarter = ((3 * V(E(:,1),:) + V(E(:,2),:)) / 4)';
-threequarter = ((V(E(:,1),:) + 3 * V(E(:,2),:)) / 4)';
+polygonV = polygonize(V, allE);
+xv = polygonV(:,1)';
+yv = polygonV(:,2)';
+midpoints = ((V(levelE(:,1),:) + V(levelE(:,2),:)) / 2)';
+onequarter = ((3 * V(levelE(:,1),:) + V(levelE(:,2),:)) / 4)';
+threequarter = ((V(levelE(:,1),:) + 3 * V(levelE(:,2),:)) / 4)';
 in1 = inpolygon(midpoints(1,:), midpoints(2,:), xv, yv);
 in2 = inpolygon(onequarter(1,:), onequarter(2,:), xv, yv);
 in3 = inpolygon(threequarter(1,:), threequarter(2,:), xv, yv);
@@ -246,7 +223,7 @@ in3 = inpolygon(threequarter(1,:), threequarter(2,:), xv, yv);
 % Now we select the indices of those that are outside and set them to an
 % insanely high weight
 outsideEdgeInds = find(~in1 | ~in2 | ~in3);
-outsideEdgeInds = [outsideEdgeInds outsideEdgeInds + size(E,1)];
+outsideEdgeInds = [outsideEdgeInds outsideEdgeInds + size(levelE,1)];
 f(outsideEdgeInds) = 1e6;
 
 % Also add the constraint that all tensions, compressions >= 0
@@ -279,7 +256,7 @@ dataOpt = stress;
 disp("stress");
 disp(stress);
 
-stressedEdges = E(stress > threshold,:);
+stressedEdges = levelE(stress > threshold,:);
 edgeSrcs = [stressedEdges(:,1); Eorig(:,1)];
 edgeDsts = [stressedEdges(:,2); Eorig(:,2)];
 
@@ -294,7 +271,6 @@ line(ax2, ...
 title(ax2,["Optimized at level " levelNum]);
 % WARNING: specific to the current design. But I want the axes to match
 % so...
-axis([0 3 0 3]);
 axis square;
 hold off
 
