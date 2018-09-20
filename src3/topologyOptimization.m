@@ -1,5 +1,3 @@
-
-
 %INPUT
 % V - Vertices stored as nx3 matrix
 % E - edges stores as mx2 matrix
@@ -14,25 +12,40 @@ function  dataOpt = topologyOptimization(V,E,levelV, levelNum)
         %eVec array of edge vectors
         
         %B matrix (constitutive model) -- this is block diagonal
-        iRows = reshape([1:2*numEdges;1:2*numEdges], 4*numEdges,1);
-        iCols = reshape([1:2:2*numEdges;2:2:2*numEdges;1:2:2*numEdges;2:2:2*numEdges], 4*numEdges,1);
+        iRows = reshape([1:3*numEdges;1:3*numEdges;1:3*numEdges], 9*numEdges,1);
+        iCols = reshape([1:3:3*numEdges;
+                         2:3:3*numEdges;
+                         3:3:3*numEdges;
+                         1:3:3*numEdges;
+                         2:3:3*numEdges;
+                         3:3:3*numEdges;
+                         1:3:3*numEdges;
+                         2:3:3*numEdges;
+                         3:3:3*numEdges;], 9*numEdges,1);
         
-        %ordering of constitutive model values [11 12 21 22]
+        %ordering of constitutive model values [11 12 13 21 22 23 31 32 33]
         lk2 = sum((eVec(1:end,:).^2),2);
         x = (ym./lk2).*(vol.^2);
-        vals = reshape([(eVec(:,1).*eVec(:,1))'; (eVec(:,1).*eVec(:,2))'; (eVec(:,2).*eVec(:,1))'; (eVec(:,2).*eVec(:,2))'], 4*numEdges, 1);
-        vals = reshape(repmat(x', 4, 1), 4*numEdges, 1).*vals;
+        vals = reshape([(eVec(:,1).*eVec(:,1))';
+                        (eVec(:,1).*eVec(:,2))';
+                        (eVec(:,1).*eVec(:,3))';
+                        (eVec(:,2).*eVec(:,1))';
+                        (eVec(:,2).*eVec(:,2))';
+                        (eVec(:,2).*eVec(:,3))';
+                        (eVec(:,3).*eVec(:,1))';
+                        (eVec(:,3).*eVec(:,2))';
+                        (eVec(:,3).*eVec(:,3))'], 9*numEdges, 1);
+        vals = reshape(repmat(x', 9, 1), 9*numEdges, 1).*vals;
         
         B = sparse(iRows, iCols, vals);
         
     end
 
-% TODO: This is not generating the trusses I want. How can I generate the
-% trusses I want?
+
+
 adjacencyMatrix = zeros(size(V,1), size(V,1));
 adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,1), E(:,2))) = 1;
 adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,2), E(:,1))) = 1;
-
 
 adjacencyMatrix = adjacencyMatrix - eye(size(V,1));
 
@@ -67,39 +80,51 @@ while ~valid
     Eorig = E;
     E = [E; Enew];
     
+%     figure
+%     ax1 = subplot(1,4,[1 2]);
+%     hold on
+%     line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], [V(Enew(:,1),3)';V(Enew(:,2),3)'], 'Color', [1 0 0]);
+%     line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], [V(Eorig(:,1),3)'; V(Eorig(:,2),3)'], 'Color', [0 0 1]);
+%     title(ax1, ["Overconstrained input at level " levelNum]);
+%     axis square;
+%     view(3);
+%     hold off
+    
     %vertex variables are flattened as [v1x, v1y; v2x, v2y ......]
     Evec = V(E(:,2),:) - V(E(:,1),:);
     
     %Build K matrix
     numEdges = size(E,1);
     numVerts = size(V,1);
-    numVars = 2*numVerts; %x and y position for each truss
-    numVarsUncompressed = 2*numEdges;
+    numVars = 3*numVerts; %x,y and z position for each truss
     
     %A matrix (accumulation, distribution)
     % i i+1 i+2 i i+1 i+2
     % j j+1 j+2 j+3 j+4 j+5
     % 1   1   1  -1  -1  -1
-    val = repmat([-1 1 -1 1], 1, numEdges);
-    iRow = reshape(repmat(1:numVarsUncompressed, 2,1),2*numVarsUncompressed,1);
-    E1ind = [2*E(:,1)-1 2*E(:,1)]';
-    E2ind = [2*E(:,2)-1 2*E(:,2)]';
-    iCol = reshape([E1ind(:) E2ind(:)]',2*numVarsUncompressed,1);
-    At = sparse(iRow, iCol, val, 2*numEdges, numVars);
+    val = repmat([-1 1 -1 1 -1 1], 1, numEdges);
     
-    forceVerts = (find(and(abs(V(:,1) - max(V(:,1)))<1e-8,V(:,2) == 0)));
+    iRow = reshape(repmat(1:(3*numEdges), 2,1),6*numEdges,1);
+    E1ind = [3*E(:,1)-2 3*E(:,1)-1 3*E(:,1)]';
+    E2ind = [3*E(:,2)-2 3*E(:,2)-1 3*E(:,2)]';
+    iCol = reshape([E1ind(:) E2ind(:)]',6*numEdges,1);
+    At = sparse(iRow, iCol, val, 3*numEdges, 3*numVerts);
+    
+    %idk what this does it was in the starter code though
+    %forceVerts = (find(and(abs(V(:,1) - max(V(:,1)))<1e-8,V(:,2) == 0)));
     
     B = constitutiveModel(ones(size(E,1), 1), 1, Evec);
     K = At'*B*At;
     
-    floorVerts = find(V(:,2) == min(V(:,2)));
+    floorVerts = find(V(:,3) == min(V(:,3)));
     isolatedVerts = setdiff(1:size(V, 1), levelV).';
     numConstraints = numel(floorVerts);
     P = eye(numel(V), numel(V));
-    P([2*[floorVerts; isolatedVerts]-1;2*[floorVerts; isolatedVerts]], :) = [];
+    P([3*[floorVerts; isolatedVerts]-2;
+       3*[floorVerts; isolatedVerts]-1;
+       3*[floorVerts; isolatedVerts]], :) = [];
     Kcon = P*K*P';
     
-    % CONSULT DAVE
     % Get minimal absolute eigenvalue.
     min_eig = min(abs(eig(Kcon)));
     disp(min_eig);
@@ -113,10 +138,11 @@ end
 figure
 ax1 = subplot(1,4,[1 2]);
 hold on
-line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], 'Color', [1 0 0]);
-line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], 'Color', [0 0 1]);
+line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], [V(Enew(:,1),3)';V(Enew(:,2),3)'], 'Color', [1 0 0]);
+line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], [V(Eorig(:,1),3)'; V(Eorig(:,2),3)'], 'Color', [0 0 1]);
 title(ax1, ["Overconstrained input at level " levelNum]);
 axis square;
+view(3);
 hold off
 
 
@@ -132,14 +158,14 @@ fExt(2:2:end) = -9.8;
 %Project out fixed constraints from matrices
 %detect nodes on "floor"
 %for floors
-floorVerts = find(V(:,2) == min(V(:,2)));
+floorVerts = find(V(:,3) == min(V(:,3)));
 
 % isolated vertices ie. vertices that are not attached to edges in this
 % level
 isolatedVerts = setdiff(1:size(V, 1), levelV).';
 numConstraints = numel(floorVerts);
 P = eye(numel(V), numel(V));
-P([2*[floorVerts; isolatedVerts]-1;2*[floorVerts; isolatedVerts]], :) = [];
+P([3*[floorVerts; isolatedVerts]-2;3*[floorVerts; isolatedVerts]-1;3*[floorVerts; isolatedVerts]], :) = [];
 
 %define J = A'
 J = At;
