@@ -101,19 +101,6 @@ for i = 1:levelManager.maxLevel
     levelE = E(Einds, :);
     levelV = levelManager.getVerticesBelowLevel(i);
     
-    
-    
-    figure
-    hold on
-    line([V(levelE(:,1),1)'; ...
-          V(levelE(:,2),1)'],...
-         [V(levelE(:,1),2)'; ...
-          V(levelE(:,2),2)'],...
-         [V(levelE(:,1),3)'; ...
-          V(levelE(:,2),3)']);
-    view(3);
-    hold off
-    
     tensions = topologyOptimization(V, levelE, levelV, i);
 end
 

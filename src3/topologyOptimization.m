@@ -141,16 +141,19 @@ hold on
 line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], [V(Enew(:,1),3)';V(Enew(:,2),3)'], 'Color', [1 0 0]);
 line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], [V(Eorig(:,1),3)'; V(Eorig(:,2),3)'], 'Color', [0 0 1]);
 title(ax1, ["Overconstrained input at level " levelNum]);
-axis square;
+axis([0 3 0 3 0 3]);
+axis square
 view(3);
 hold off
 
 
-fExt = zeros(size(V,1),2);
+fExt = zeros(size(V,1),3);
 %fExt(forceVerts, 2) = -0.1;
 
 fExt = reshape(transpose(fExt), numVars, 1);
-fExt(2:2:end) = -9.8;
+
+%The "downwards" direction. Which in this case is the third coordinate.
+fExt(3:3:end) = -9.8;
 
 % NOISE
 %fExt(1:2:end) = (rand(size(fExt, 1) / 2, 1) - 0.5) * 2;
@@ -176,7 +179,7 @@ Jcon = J*P';
 fcon = P*fExt;
 
 %Truss direction matrix
-bIndices = repmat(1:size(E,1), 2,1);
+bIndices = repmat(1:size(E,1), 3,1);
 bI = 1:numel(Evec);
 bJ = bIndices(:);
 
@@ -236,7 +239,7 @@ f = ones(size(Aeq, 2), 1);
 % roofVerts. We want roofVerts because we want to assign roof edges a
 % super-low cost. For now let's do it for the "absolute roof", but we can
 % change this later to the incremental roof.
-roofVerts = find(V(:,2) == max(V(:,2)));
+roofVerts = find(V(:,3) == max(V(:,3)));
 [X, Y] = meshgrid(roofVerts, roofVerts);
 roofEdges = intersect([X(:) Y(:)], E, 'rows');
 
@@ -311,17 +314,13 @@ edgeDsts = [stressedEdges(:,2); Eorig(:,2)];
 
 ax2 = subplot(1,4,[3 4]);
 hold on
-line(ax2, ...
-     [V(edgeSrcs,1)'; ...
-      V(edgeDsts,1)'], ...
-     [V(edgeSrcs,2)'; ...
-      V(edgeDsts,2)'], ...
-     'Color', [0 0 1]);
+line(ax2, [V(edgeSrcs,1)'; V(edgeDsts,1)'], [V(edgeSrcs,2)'; V(edgeDsts,2)'], [V(edgeSrcs,3)'; V(edgeDsts,3)'], 'Color', [0 0 1]);
 title(ax2,["Optimized at level " levelNum]);
 % WARNING: specific to the current design. But I want the axes to match
 % so...
-axis([0 3 0 3]);
+axis([0 3 0 3 0 3]);
 axis square;
+view(3)
 hold off
 
 end
