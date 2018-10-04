@@ -1,6 +1,7 @@
-function main(png_filename)
+function main(obj_filename)
 V = [];
 E = [];
+F = [];
 
 if (nargin < 1)
     %IMMA DRAW THE T. In 3d!
@@ -61,16 +62,27 @@ if (nargin < 1)
          9 21;
          10 22;
          12 24;];
+     
+     disp('Contents of workspace before loading file:');
+     whos
+     disp('Contents of results_sigAsia_1_4.mat:');
+     whos('-file', '../meshes/results_sigAsia_1_4.mat');
     
-else
-    [V, F] = bwmesh(png_filename);
-    [F2, V2] = reducepatch(F, V, 5);
-    E = boundary_faces(F2);
+else % expect and OBJ from Blender
+    [V, F] = readOBJ(obj_filename);
+    % for some reason the display is rotated so the first thing
+    % I'm going to do is un-rotate it
+    rot = [1 0 0; 0 0 1; 0 -1 0];
+    V = V * rot;
+    
     figure
+    hold on
     tsurf(F, V);
+    axis equal;
+    view(3);
+    hold off
     
-    figure
-    tsurf(F2, V2);
+    E = edges(F);
 end
 
 
@@ -86,6 +98,7 @@ line([V(E(:,1),1)'; ...
       V(E(:,2),2)'],...
      [V(E(:,1),3)'; ...
       V(E(:,2),3)']);
+axis equal;
 view(3);
 hold off
 

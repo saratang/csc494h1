@@ -134,15 +134,32 @@ while ~valid
         E = Eorig;
     end
 end
-    
+
+% TODO: to get better pictures, use wire_mesh, then tri_mesh
+
+
 figure
 ax1 = subplot(1,4,[1 2]);
 hold on
-line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], [V(Enew(:,1),3)';V(Enew(:,2),3)'], 'Color', [1 0 0]);
-line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], [V(Eorig(:,1),3)'; V(Eorig(:,2),3)'], 'Color', [0 0 1]);
+
+% wire_mesh is having trouble because there are isolated vertices.
+% FIX: let WV be the positions of V in our level, and WE be the edges
+% indexed according to WV.
+
+% TODO: find is a terrible way to make WEorig, WEnew.
+% You should write your own function haha.
+WV = V(levelV, :, :);
+WEorig = arrayfun(@(x) find(levelV == x), Eorig);
+WEnew = arrayfun(@(x) find(levelV == x), Enew(find(Enew(:,1) ~= Enew(:,2)),:));
+
+[Vorig, Forig] = wire_mesh(WV, WEorig, 'Thickness', 0.05);
+[Vnew, Fnew] = wire_mesh(WV, WEnew, 'Thickness', 0.05);
+
+trimesh(Fnew, Vnew(:,1,:), Vnew(:,2,:), Vnew(:,3,:), 'edgecolor', 'r');
+trimesh(Forig, Vorig(:,1,:), Vorig(:,2,:), Vorig(:,3,:), 'edgecolor', 'b');
+
 title(ax1, ["Overconstrained input at level " levelNum]);
-axis([0 3 0 3 0 3]);
-axis square
+axis equal
 view(3);
 hold off
 
@@ -249,6 +266,8 @@ roofInds = find(ismember(E, roofEdges, 'rows'));
 roofInds = [roofInds roofInds + size(E,1)];
 f(roofInds) = 0;
 
+% TODO: We want to distinguish between overconstrainedInds that are inside
+% our structure and those outside.
 overconstrainedInds = [size(E, 1) - size(Enew, 1) + 1:size(E, 1)];
 overconstrainedInds = [overconstrainedInds overconstrainedInds + size(E,1)];
 f(overconstrainedInds) = 1e3;
@@ -257,6 +276,13 @@ f(overconstrainedInds) = 1e3;
 % For now, assume we have an outline and not a triangle mesh.
 % Do this by querying the midpoint of each edge and seeing if it's in the
 % polygon.
+
+% Use winding_number from gp-toolbox. To do this, we need a triangle mesh.
+
+figure
+shp = alphaShape(V);
+plot(shp);
+axis equal;
 
 % FORMAT: inpolygon(xq, yq, xv, yv) where
 %  - xq, yq are the coordinates we want to query
@@ -318,8 +344,7 @@ line(ax2, [V(edgeSrcs,1)'; V(edgeDsts,1)'], [V(edgeSrcs,2)'; V(edgeDsts,2)'], [V
 title(ax2,["Optimized at level " levelNum]);
 % WARNING: specific to the current design. But I want the axes to match
 % so...
-axis([0 3 0 3 0 3]);
-axis square;
+axis equal;
 view(3)
 hold off
 
