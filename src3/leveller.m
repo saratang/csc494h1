@@ -19,7 +19,6 @@ classdef leveller
         % Given the mesh and the ground nodes, populate the levels using BFS
         function obj = leveller(vertices, edges)
             groundVertices = find(vertices(:,3) == min(vertices(:,3)));
-            disp(groundVertices);
             
             obj.levelsToEdges = containers.Map('KeyType', 'double', 'ValueType', 'any');
             obj.levelsToVertices = containers.Map('KeyType', 'double', 'ValueType', 'any');
@@ -73,7 +72,6 @@ classdef leveller
                         obj.edgesToLevels(edgeID) = min(obj.edgesToLevels(edgeID), curLevel);
                     end
                 end
-                disp(T);
             end
             
             % invert the map to get {level : array of edges}

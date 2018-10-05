@@ -4,7 +4,7 @@
 % levelV - indices of vertices that are in the current level
 % levelNum is the current level. I guess I'll get rid of it later since I just use
 % it to label figures.
-function  dataOpt = topologyOptimization(V,E,levelV, levelNum)
+function  dataOpt = topologyOptimization(V,E,levelV, levelNum, F)
 
     function B = constitutiveModel(vol, ym, eVec)
         %vol is a vector of truss volumes
@@ -41,7 +41,24 @@ function  dataOpt = topologyOptimization(V,E,levelV, levelNum)
         
     end
 
-
+    function WE = reindex_edges(reindex_map, levelV, E)
+        % re-index the edges according to the index of each vertex in
+        % levelV instead of the value at the index
+        
+        % basically I don't want to use the find function all the time
+        % so I'm going to make a map of Vind->ind in levelV
+        
+        WE = E;
+        
+        for vid = 1:numel(E)
+            if isKey(reindex_map, E(vid))
+                WE(vid) = reindex_map(E(vid));
+            else
+                reindex_map(E(vid)) = find(levelV == E(vid));
+                WE(vid) = reindex_map(E(vid));
+            end
+        end
+    end
 
 adjacencyMatrix = zeros(size(V,1), size(V,1));
 adjacencyMatrix(sub2ind(size(adjacencyMatrix),E(:,1), E(:,2))) = 1;
@@ -53,43 +70,10 @@ newTrusses = adjacencyMatrix;
 K = [];
 At = [];
 valid = 0;
+Eorig = E;
+Enew = E;
 
 while ~valid
-    newTrusses = newTrusses * adjacencyMatrix;
-    
-    Enew = [];
-    
-    %extract new edges
-    for ii=1:size(V,1)
-        temp = find(newTrusses(ii,:) ~=0);
-        
-        for jj = 1:numel(temp)
-            Enew = [Enew; ii temp(jj)];
-        end
-    end
-    
-    Enew = unique([Enew; Enew(:,2) Enew(:,1)], 'rows');
-    %add some new edges to make the structure statically over determined
-    
-    %strip non unique edges
-    [Ecommon1, IA, IB] = intersect(E, Enew, 'rows');
-    Enew(IB,:) = [];
-    
-    [Ecommon1, IA, IB] = intersect(E, [Enew(:,2) Enew(:,1)], 'rows');
-    Enew(IB,:) = [];
-    Eorig = E;
-    E = [E; Enew];
-    
-%     figure
-%     ax1 = subplot(1,4,[1 2]);
-%     hold on
-%     line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], [V(Enew(:,1),3)';V(Enew(:,2),3)'], 'Color', [1 0 0]);
-%     line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], [V(Eorig(:,1),3)'; V(Eorig(:,2),3)'], 'Color', [0 0 1]);
-%     title(ax1, ["Overconstrained input at level " levelNum]);
-%     axis square;
-%     view(3);
-%     hold off
-    
     %vertex variables are flattened as [v1x, v1y; v2x, v2y ......]
     Evec = V(E(:,2),:) - V(E(:,1),:);
     
@@ -109,10 +93,7 @@ while ~valid
     E2ind = [3*E(:,2)-2 3*E(:,2)-1 3*E(:,2)]';
     iCol = reshape([E1ind(:) E2ind(:)]',6*numEdges,1);
     At = sparse(iRow, iCol, val, 3*numEdges, 3*numVerts);
-    
-    %idk what this does it was in the starter code though
-    %forceVerts = (find(and(abs(V(:,1) - max(V(:,1)))<1e-8,V(:,2) == 0)));
-    
+        
     B = constitutiveModel(ones(size(E,1), 1), 1, Evec);
     K = At'*B*At;
     
@@ -132,28 +113,44 @@ while ~valid
     
     if ~valid
         E = Eorig;
+        newTrusses = newTrusses * adjacencyMatrix;
+
+        %extract new edges
+        for ii=1:size(V,1)
+            temp = find(newTrusses(ii,:) ~=0);
+
+            for jj = 1:numel(temp)
+                if ii ~= temp(jj)   
+                    Enew = [Enew; ii temp(jj)];
+                end
+            end
+        end
+
+        Enew = unique([Enew; Enew(:,2) Enew(:,1)], 'rows');
+        %add some new edges to make the structure statically over determined
+
+        %strip non unique edges
+        [Ecommon1, IA, IB] = intersect(E, Enew, 'rows');
+        Enew(IB,:) = [];
+
+        [Ecommon1, IA, IB] = intersect(E, [Enew(:,2) Enew(:,1)], 'rows');
+        Enew(IB,:) = [];
+        E = [E; Enew];
     end
+
 end
 
-% TODO: to get better pictures, use wire_mesh, then tri_mesh
+reindex_map = containers.Map('Keytype', 'double', 'Valuetype', 'double');
+WV = V(levelV, :, :);
+WEorig = reindex_edges(reindex_map, levelV, Eorig);
+WEnew = reindex_edges(reindex_map, levelV, Enew);
 
+[Vorig, Forig] = wire_mesh(WV, WEorig, 'Thickness', 0.05);
+[Vnew, Fnew] = wire_mesh(WV, WEnew, 'Thickness', 0.05);
 
 figure
 ax1 = subplot(1,4,[1 2]);
 hold on
-
-% wire_mesh is having trouble because there are isolated vertices.
-% FIX: let WV be the positions of V in our level, and WE be the edges
-% indexed according to WV.
-
-% TODO: find is a terrible way to make WEorig, WEnew.
-% You should write your own function haha.
-WV = V(levelV, :, :);
-WEorig = arrayfun(@(x) find(levelV == x), Eorig);
-WEnew = arrayfun(@(x) find(levelV == x), Enew(find(Enew(:,1) ~= Enew(:,2)),:));
-
-[Vorig, Forig] = wire_mesh(WV, WEorig, 'Thickness', 0.05);
-[Vnew, Fnew] = wire_mesh(WV, WEnew, 'Thickness', 0.05);
 
 trimesh(Fnew, Vnew(:,1,:), Vnew(:,2,:), Vnew(:,3,:), 'edgecolor', 'r');
 trimesh(Forig, Vorig(:,1,:), Vorig(:,2,:), Vorig(:,3,:), 'edgecolor', 'b');
@@ -279,28 +276,24 @@ f(overconstrainedInds) = 1e3;
 
 % Use winding_number from gp-toolbox. To do this, we need a triangle mesh.
 
-figure
-shp = alphaShape(V);
-plot(shp);
-axis equal;
 
-% FORMAT: inpolygon(xq, yq, xv, yv) where
-%  - xq, yq are the coordinates we want to query
-%  - xv, yv are row vectors such that (xvi, yvi) defines a vertex of the
+% FORMAT: winding_number(V, F, O) where
+%  - V is a 3-list of vertex poistions
+%  - F is a 3-list of triangle indices
+%  - O is a 3-list of queries
 %  polygon
 
-xv = V(:,1)';
-yv = V(:,2)';
-midpoints = ((V(E(:,1),:) + V(E(:,2),:)) / 2)';
-onequarter = ((3 * V(E(:,1),:) + V(E(:,2),:)) / 4)';
-threequarter = ((V(E(:,1),:) + 3 * V(E(:,2),:)) / 4)';
-in1 = inpolygon(midpoints(1,:), midpoints(2,:), xv, yv);
-in2 = inpolygon(onequarter(1,:), onequarter(2,:), xv, yv);
-in3 = inpolygon(threequarter(1,:), threequarter(2,:), xv, yv);
+midpoints = ((V(E(:,1),:) + V(E(:,2),:)) / 2);
+onequarter = ((3 * V(E(:,1),:) + V(E(:,2),:)) / 4);
+threequarter = ((V(E(:,1),:) + 3 * V(E(:,2),:)) / 4);
+
+in1 = winding_number(V, F, midpoints);
+in2 = winding_number(V, F, onequarter);
+in3 = winding_number(V, F, threequarter);
 
 % Now we select the indices of those that are outside and set them to an
 % insanely high weight
-outsideEdgeInds = find(~in1 | ~in2 | ~in3);
+outsideEdgeInds = find(in1 < 1e-04 | in2 < 1e-04 | in3 < 1e-04);
 outsideEdgeInds = [outsideEdgeInds outsideEdgeInds + size(E,1)];
 f(outsideEdgeInds) = 1e6;
 
@@ -335,15 +328,14 @@ disp("stress");
 disp(stress);
 
 stressedEdges = E(stress > threshold,:);
-edgeSrcs = [stressedEdges(:,1); Eorig(:,1)];
-edgeDsts = [stressedEdges(:,2); Eorig(:,2)];
+
+WEfinal = reindex_edges(reindex_map, levelV, [stressedEdges; Eorig]);
+[Vfinal, Ffinal] = wire_mesh(WV, WEfinal, 'Thickness', 0.05);
 
 ax2 = subplot(1,4,[3 4]);
 hold on
-line(ax2, [V(edgeSrcs,1)'; V(edgeDsts,1)'], [V(edgeSrcs,2)'; V(edgeDsts,2)'], [V(edgeSrcs,3)'; V(edgeDsts,3)'], 'Color', [0 0 1]);
+trimesh(Ffinal, Vfinal(:,1,:), Vfinal(:,2,:), Vfinal(:,3,:), 'edgecolor', 'b');
 title(ax2,["Optimized at level " levelNum]);
-% WARNING: specific to the current design. But I want the axes to match
-% so...
 axis equal;
 view(3)
 hold off

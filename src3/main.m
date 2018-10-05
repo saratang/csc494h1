@@ -88,7 +88,6 @@ end
 
 %TODO: find a better way to do this. BFS fails if the edges are not unique
 %uniquify
-%E = E(E(:, 1) < E(:, 2), :);
 
 figure
 hold on
@@ -114,7 +113,7 @@ for i = 1:levelManager.maxLevel
     levelE = E(Einds, :);
     levelV = levelManager.getVerticesBelowLevel(i);
     
-    tensions = topologyOptimization(V, levelE, levelV, i);
+    tensions = topologyOptimization(V, levelE, levelV, i, F);
 end
 
 end
