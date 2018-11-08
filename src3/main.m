@@ -63,10 +63,10 @@ if (nargin < 1)
          10 22;
          12 24;];
      
-     disp('Contents of workspace before loading file:');
-     whos
-     disp('Contents of results_sigAsia_1_4.mat:');
-     whos('-file', '../meshes/results_sigAsia_1_4.mat');
+%      disp('Contents of workspace before loading file:');
+%      whos
+%      disp('Contents of results_sigAsia_1_4.mat:');
+%      whos('-file', '../meshes/results_sigAsia_1_4.mat');
     
 else % expect and OBJ from Blender
     [V, F] = readOBJ(obj_filename);
@@ -84,10 +84,6 @@ else % expect and OBJ from Blender
     
     E = edges(F);
 end
-
-
-%TODO: find a better way to do this. BFS fails if the edges are not unique
-%uniquify
 
 figure
 hold on
@@ -108,12 +104,34 @@ hold off
 
 levelManager = leveller(V, E);
 
+colors = [ 0 0 1; 0 1 0; 1 0 0];
+
+figure
+for i = 0:levelManager.maxLevel
+    Einds = levelManager.getEdgesInLevel(i);
+    levelE = E(Einds, :);
+    
+    hold on
+    line([V(levelE(:,1),1)';V(levelE(:,2),1)'],[V(levelE(:,1),2)';V(levelE(:,2),2)'], [V(levelE(:,1),3)'; V(levelE(:,2),3)'], 'Color', colors(mod(i, 3) + 1, :));
+    axis equal;
+    view(3);
+    hold off
+    
+end
+
 for i = 1:levelManager.maxLevel
     Einds = levelManager.getEdgesBelowLevel(i);
     levelE = E(Einds, :);
     levelV = levelManager.getVerticesBelowLevel(i);
     
-    tensions = topologyOptimization(V, levelE, levelV, i, F);
+     figure
+     hold on
+     line([V(levelE(:,1),1)';V(levelE(:,2),1)'],[V(levelE(:,1),2)';V(levelE(:,2),2)'], [V(levelE(:,1),3)'; V(levelE(:,2),3)'], 'Color', [0 0 1]);
+     axis equal;
+     view(3);
+     hold off
+    
+     %tensions = topologyOptimization(V, levelE, levelV, i, F);
 end
 
 end

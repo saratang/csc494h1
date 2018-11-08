@@ -97,7 +97,7 @@ while ~valid
     B = constitutiveModel(ones(size(E,1), 1), 1, Evec);
     K = At'*B*At;
     
-    floorVerts = find(V(:,3) == min(V(:,3)));
+    floorVerts = find(abs(V(:,3) - min(V(:,3)) < 1e-4));
     isolatedVerts = setdiff(1:size(V, 1), levelV).';
     numConstraints = numel(floorVerts);
     P = eye(numel(V), numel(V));
@@ -112,6 +112,15 @@ while ~valid
     valid = (min_eig > sqrt(eps));
     
     if ~valid
+%          figure
+%          hold on
+%          line([V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], [V(Enew(:,1),3)';V(Enew(:,2),3)'], 'Color', [1 0 0]);
+%          line([V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], [V(Eorig(:,1),3)'; V(Eorig(:,2),3)'], 'Color', [0 0 1]);
+%          title(["Overconstrained input at level " levelNum]);
+%          axis equal;
+%          view(3);
+%          hold off
+        
         E = Eorig;
         newTrusses = newTrusses * adjacencyMatrix;
 
@@ -140,26 +149,35 @@ while ~valid
 
 end
 
-reindex_map = containers.Map('Keytype', 'double', 'Valuetype', 'double');
-WV = V(levelV, :, :);
-WEorig = reindex_edges(reindex_map, levelV, Eorig);
-WEnew = reindex_edges(reindex_map, levelV, Enew);
+% reindex_map = containers.Map('Keytype', 'double', 'Valuetype', 'double');
+% WV = V(levelV, :, :);
+% WEorig = reindex_edges(reindex_map, levelV, Eorig);
+% WEnew = reindex_edges(reindex_map, levelV, Enew);
+%
+% [Vorig, Forig] = wire_mesh(WV, WEorig, 'Thickness', 0.05);
+% [Vnew, Fnew] = wire_mesh(WV, WEnew, 'Thickness', 0.05);
+% 
+% figure
+% ax1 = subplot(1,4,[1 2]);
+% hold on
+% 
+% trimesh(Fnew, Vnew(:,1,:), Vnew(:,2,:), Vnew(:,3,:), 'edgecolor', 'r');
+% trimesh(Forig, Vorig(:,1,:), Vorig(:,2,:), Vorig(:,3,:), 'edgecolor', 'b');
+% 
+% title(ax1, ["Overconstrained input at level " levelNum]);
+% axis equal
+% view(3);
+% hold off
 
-[Vorig, Forig] = wire_mesh(WV, WEorig, 'Thickness', 0.05);
-[Vnew, Fnew] = wire_mesh(WV, WEnew, 'Thickness', 0.05);
-
-figure
-ax1 = subplot(1,4,[1 2]);
-hold on
-
-trimesh(Fnew, Vnew(:,1,:), Vnew(:,2,:), Vnew(:,3,:), 'edgecolor', 'r');
-trimesh(Forig, Vorig(:,1,:), Vorig(:,2,:), Vorig(:,3,:), 'edgecolor', 'b');
-
-title(ax1, ["Overconstrained input at level " levelNum]);
-axis equal
-view(3);
-hold off
-
+ figure
+ ax1 = subplot(1,4,[1 2]);
+ hold on
+ line(ax1, [V(Enew(:,1),1)';V(Enew(:,2),1)'],[V(Enew(:,1),2)';V(Enew(:,2),2)'], [V(Enew(:,1),3)';V(Enew(:,2),3)'], 'Color', [1 0 0]);
+ line(ax1, [V(Eorig(:,1),1)';V(Eorig(:,2),1)'],[V(Eorig(:,1),2)';V(Eorig(:,2),2)'], [V(Eorig(:,1),3)'; V(Eorig(:,2),3)'], 'Color', [0 0 1]);
+ title(ax1, ["Overconstrained input at level " levelNum]);
+ axis equal;
+ view(3);
+ hold off
 
 fExt = zeros(size(V,1),3);
 %fExt(forceVerts, 2) = -0.1;
@@ -175,7 +193,7 @@ fExt(3:3:end) = -9.8;
 %Project out fixed constraints from matrices
 %detect nodes on "floor"
 %for floors
-floorVerts = find(V(:,3) == min(V(:,3)));
+floorVerts = find(abs(V(:,3) - min(V(:,3))) < 1e-4);
 
 % isolated vertices ie. vertices that are not attached to edges in this
 % level
@@ -329,13 +347,26 @@ disp(stress);
 
 stressedEdges = E(stress > threshold,:);
 
-WEfinal = reindex_edges(reindex_map, levelV, [stressedEdges; Eorig]);
-[Vfinal, Ffinal] = wire_mesh(WV, WEfinal, 'Thickness', 0.05);
+% WEfinal = reindex_edges(reindex_map, levelV, [stressedEdges; Eorig]);
+% [Vfinal, Ffinal] = wire_mesh(WV, WEfinal, 'Thickness', 0.05);
+% 
+% ax2 = subplot(1,4,[3 4]);
+% hold on
+% trimesh(Ffinal, Vfinal(:,1,:), Vfinal(:,2,:), Vfinal(:,3,:), 'edgecolor', 'b');
+% title(ax2,["Optimized at level " levelNum]);
+% axis equal;
+% view(3)
+% hold off
+
+edgeSrcs = [stressedEdges(:,1); Eorig(:,1)];
+edgeDsts = [stressedEdges(:,2); Eorig(:,2)];
 
 ax2 = subplot(1,4,[3 4]);
 hold on
-trimesh(Ffinal, Vfinal(:,1,:), Vfinal(:,2,:), Vfinal(:,3,:), 'edgecolor', 'b');
+line(ax2, [V(edgeSrcs,1)'; V(edgeDsts,1)'], [V(edgeSrcs,2)'; V(edgeDsts,2)'], [V(edgeSrcs,3)'; V(edgeDsts,3)'], 'Color', [0 0 1]);
 title(ax2,["Optimized at level " levelNum]);
+% WARNING: specific to the current design. But I want the axes to match
+% so...
 axis equal;
 view(3)
 hold off

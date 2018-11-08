@@ -18,7 +18,8 @@ classdef leveller
     methods
         % Given the mesh and the ground nodes, populate the levels using BFS
         function obj = leveller(vertices, edges)
-            groundVertices = find(vertices(:,3) == min(vertices(:,3)));
+            ground = min(vertices(:,3));
+            groundVertices = find(abs(vertices(:,3) - ground) < 1e-4);
             
             obj.levelsToEdges = containers.Map('KeyType', 'double', 'ValueType', 'any');
             obj.levelsToVertices = containers.Map('KeyType', 'double', 'ValueType', 'any');
@@ -47,16 +48,26 @@ classdef leveller
             G = graph(table(edges, 'variableNames', {'EndNodes'}));
             for i = 1:size(groundVertices, 1)
                 groundV = groundVertices(i);
-                T = bfsearch(G, groundV, {'edgetonew', 'edgetodiscovered'});
+                % This is not working for examples where we loop backwards?
+                % idk but it's not working for the rabbit for example.
+                T = bfsearch(G, groundV, {'edgetonew', 'edgetodiscovered', 'finishnode', 'discovernode'});
                 curLevel = 1;
-                updateLevel = NaN;
+                updateLevel = groundV;
+                lastDiscovered = groundV;
                 for eid = 1:size(T, 1)
                     event = T.Event(eid);
                     edge = T.Edge(eid, :);
                     node = T.Node(eid);
-                    if (edge(1) == updateLevel)
-                        updateLevel = NaN;
-                        curLevel = curLevel + 1;
+                    
+                    if event == 'discovernode'
+                        lastDiscovered = node;
+                    end
+                    
+                    if event == 'finishnode'
+                        if node == updateLevel
+                            updateLevel = lastDiscovered;
+                            curLevel = curLevel + 1;
+                        end
                     end
                     
                     if event == 'edgetonew'
@@ -68,6 +79,9 @@ classdef leveller
                         obj.verticesToLevels(edge(2)) = min(obj.verticesToLevels(edge(2)), curLevel);
                     end
                     if event == 'edgetodiscovered'
+%                         if (isnan(updateLevel))
+%                             updateLevel = edge(2);
+%                         end
                         edgeID = getEdgeIndex(edges, edge);
                         obj.edgesToLevels(edgeID) = min(obj.edgesToLevels(edgeID), curLevel);
                     end
@@ -109,7 +123,11 @@ classdef leveller
             
             E = [];
             for level = 0:levelNum
-                E = [E; obj.levelsToEdges(level)];
+                if (isKey(obj.levelsToEdges, level))
+                    E = [E; obj.levelsToEdges(level)];
+                else
+                    fprintf("no edges in level %d\n", level);
+                end
             end
         end
         
